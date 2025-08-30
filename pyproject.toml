@@ -1,6 +1,6 @@
 [project]
 name = "nanokontrol-config"
-version = "0.1.1"
+version = "0.2.0"
 description = "Configuration tool for Korg nanoKontrol Studio"
 authors = [{name = "Frans Fürst", email = "frans.fuerst+gitlab@protonmail.com"}]
 readme = "README.md"
