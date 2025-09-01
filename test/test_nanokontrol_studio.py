@@ -90,6 +90,24 @@ from nanokontrol_config.nanokontrol_studio import (
     "raw_str, properties",
     [
         (
+            "42 50 00 FF",
+            {
+                "type": SysexMessage.Type.SEARCH_DEVICE,
+            },
+        ),
+        (
+            "42 42 00 01 37 01 00 00 12",
+            {
+                "type": SysexMessage.Type.REQUEST_MODE,
+            },
+        ),
+        (
+            "42 42 00 01 37 02 00 00 42 00",
+            {
+                "type": SysexMessage.Type.MODE,
+            },
+        ),
+        (
             "7E 7F 06 01",
             {
                 "type": SysexMessage.Type.DEVICE_INQUIRY_REQUEST,
@@ -97,12 +115,14 @@ from nanokontrol_config.nanokontrol_studio import (
         ),
         (
             "7E 02 06 02 42 37 01 00 00 05 00 01 00",
-            {"type": SysexMessage.Type.DEVICE_INQUIRY_REPLY},
+            {
+                "type": SysexMessage.Type.DEVICE_INQUIRY_REPLY,
+            },
         ),
         (
             "42 42 00 01 37 01 00 00 10",
             {
-                "type": NanoKontrolSysexMessage.Type.REQUEST_CURRENT_SCENE_CONFIG
+                "type": NanoKontrolSysexMessage.Type.REQUEST_CURRENT_SCENE_CONFIG,
             },
         ),
         (
