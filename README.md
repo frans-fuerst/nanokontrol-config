@@ -30,7 +30,7 @@ uvx nanokontrol-config ...
 .. or checkout the project and run it via `uv run`
 ```bash
 # have git and uv installed first
-git clone https://projects.om-office.de/frans/nanokontrol-config.git
+git clone https://github.com/frans-fuerst/nanokontrol-config.git
 cd nanokontrol-config
 uv run nanokontrol-config ...
 ```
@@ -93,7 +93,7 @@ See [License.md].
 ### Initialize
 
 ```bash
-git clone https://projects.om-office.de/frans/nanokontrol-config.git
+git clone https://github.com/frans-fuerst/nanokontrol-config.git
 cd nanokontrol-config
 uv run pre-commit install
 ```

@@ -17,8 +17,7 @@ nanokontrol-config = "nanokontrol_config.cli:main"
 
 [project.urls]
 #"Home Page" = "https://example.com"
-Repository = "https://projects.om-office.de/frans/nanokontrol-config.git"
-#GitHub = "https://github.com/example/spam"
+Repository = "https://github.com/frans-fuerst/nanokontrol-config.git"
 
 # [tool.uv.sources]
 # trickkiste = { path = "../trickkiste", editable = true }
