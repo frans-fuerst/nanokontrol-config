@@ -66,7 +66,7 @@ class GlobalConfig(StrictModel):
     global_midi_channel: int = 0  # raw, i.e. 0..15
     controller_mode: int = 0  # 0 = assignable, 1=cubase..
     battery_type: int = 0  # 0=Alkalline, 1=NiMH
-    name: str = "nanoKontrol Studio"
+    wireless_name: str = "nanoKontrol Studio"
     scene_button_as_scrub: int = 0
 
     usb_auto_led_off: int = 3
@@ -89,7 +89,7 @@ class GlobalConfig(StrictModel):
             controller_mode=data[1],
             battery_type=data[2],
             scene_button_as_scrub=data[3],
-            name=data[8:33]
+            wireless_name=data[8:33]
             .decode(encoding="ascii", errors="ignore")
             .replace("\0", "")
             .strip(),
@@ -108,7 +108,9 @@ class GlobalConfig(StrictModel):
         result[1] = self.controller_mode
         result[2] = self.battery_type
         result[3] = self.scene_button_as_scrub
-        result[8:33] = self.name.encode(encoding="ascii").ljust(25, b"\0")
+        result[8:33] = self.wireless_name.encode(encoding="ascii").ljust(
+            25, b"\0"
+        )
         result[64] = 0  # ?? (maybe usb_auto_power_safe)
         result[65] = self.usb_auto_led_off
         result[66] = self.usb_led_brightness
@@ -124,7 +126,7 @@ class GlobalConfig(StrictModel):
         return bytes(result)
 
     def dump(self) -> None:
-        print(f"Name: '{self.name}'")
+        print(f"Name: '{self.wireless_name}'")
         print(f" midi: '{self.global_midi_channel + 1}'")
         # controller_mode: int = 0  # 0 = assignable, 1=cubase..
         # battery_type: int = 0  # 0=Alkalline, 1=NiMH
@@ -141,102 +143,102 @@ class GlobalConfig(StrictModel):
 
 
 class Scalar(StrictModel):
-    midi_channel: int
+    channel: int
     disabled: int = 0
-    midi_cc: int
-    lower_value: int = 0
-    upper_value: int = 127
+    cc: int
+    lo_val: int = 0
+    hi_val: int = 127
 
     @classmethod
     def default(cls, index: int) -> "Scalar":
         return cls(
-            midi_channel=1 + index,
-            midi_cc=13 + index,
+            channel=1 + index,
+            cc=13 + index,
         )
 
     @classmethod
     def from_raw(cls, data: bytes) -> "Scalar":
         return cls(
-            midi_channel=data[0] + 1,
+            channel=data[0] + 1,
             disabled=data[1],
-            midi_cc=data[2],
-            lower_value=data[3],
-            upper_value=data[4],
+            cc=data[2],
+            lo_val=data[3],
+            hi_val=data[4],
         )
 
     def serialize(self) -> bytes:
         return bytes(
             (
-                self.midi_channel - 1,
+                self.channel - 1,
                 0,
-                self.midi_cc,
-                self.lower_value,
-                self.upper_value,
+                self.cc,
+                self.lo_val,
+                self.hi_val,
             )
         )
 
     def param_str(self) -> str:
-        return f"(c={self.midi_channel:>2} cc={self.midi_cc:>3} l={self.lower_value:>2} u={self.upper_value:>3})"
+        return f"(c={self.channel:>2} cc={self.cc:>3} l={self.lo_val:>2} u={self.hi_val:>3})"
 
 
 class Button(StrictModel):
-    midi_channel: int
-    assign_type: int = 0  # 0: ControlChange
-    cc_note_value: int
-    off_value: int = 0
-    on_value: int = 127
+    channel: int
+    type: int = 0  # 0: ControlChange, 1
+    cc_note: int
+    off_val: int = 0
+    on_val: int = 127
     behavior: int = 0  # 0: momentary, 1: toggle
 
     @classmethod
     def default(cls, index: int) -> "Button":
         return cls(
-            midi_channel=1,
-            cc_note_value=0,
+            channel=1,
+            cc_note=0,
         )
 
     @classmethod
     def from_raw(cls, data: bytes) -> "Button":
         """ """
         return cls(
-            midi_channel=data[0] + 1,
-            assign_type=data[1],
-            cc_note_value=data[2],
-            off_value=data[3],
-            on_value=data[4],
+            channel=data[0] + 1,
+            type=data[1],
+            cc_note=data[2],
+            off_val=data[3],
+            on_val=data[4],
             behavior=data[5],
         )
 
     def serialize(self) -> bytes:
         return bytes(
             (
-                self.midi_channel - 1,
-                self.assign_type,
-                self.cc_note_value,
-                self.off_value,
-                self.on_value,
+                self.channel - 1,
+                self.type,
+                self.cc_note,
+                self.off_val,
+                self.on_val,
                 self.behavior,
             )
         )
 
     def param_str(self) -> str:
         return (
-            f"(c:{self.midi_channel:>2}"
-            f" {'nt' if self.assign_type else 'cc'}:{self.cc_note_value:>3}"
-            f" b:{self.off_value:>2}-{self.on_value:>3}"
+            f"(c:{self.channel:>2}"
+            f" {'nt' if self.type else 'cc'}:{self.cc_note:>3}"
+            f" b:{self.off_val:>2}-{self.on_val:>3}"
             f" {'t' if self.behavior else 'm'})"
         )
 
 
 class JogWheel(StrictModel):
-    midi_channel: int
-    wheel_type: int = 0
-    acceleration: int = 0
+    channel: int
+    type: int = 0
+    acc: int = 0
     sign_mag_cc: int = 82
     inc_dec_cw_cc: int = 83
     inc_dec_ccw_cc: int = 85
     continuous_cc: int = 86
-    min_val: int = 0
-    max_val: int = 127
+    hi_val: int = 0
+    lo_val: int = 127
     """
     512-010-?|513-002-?|514-000-?|515-087-W|516-088-X|517-089-Y|518-090-Z|519-007-?|
     520-120-x|521-255-■|522-255-■|523-255-■|524-255-■|525-255-■|526-255-■|527-255-■|
@@ -244,34 +246,34 @@ class JogWheel(StrictModel):
 
     @classmethod
     def default(cls) -> "JogWheel":
-        return cls(midi_channel=1)
+        return cls(channel=1)
 
     @classmethod
     def from_raw(cls, data: Sequence[int]) -> "JogWheel":
         return cls(
-            midi_channel=data[0] + 1,
-            wheel_type=data[1],
-            acceleration=data[2],
+            channel=data[0] + 1,
+            type=data[1],
+            acc=data[2],
             sign_mag_cc=data[3],
             inc_dec_cw_cc=data[4],
             inc_dec_ccw_cc=data[5],
             continuous_cc=data[6],
-            min_val=data[7],
-            max_val=data[8],
+            lo_val=data[7],
+            hi_val=data[8],
         )
 
     def serialize(self) -> bytes:
         return bytes(
             (
-                self.midi_channel - 1,
-                self.wheel_type,
-                self.acceleration,
+                self.channel - 1,
+                self.type,
+                self.acc,
                 self.sign_mag_cc,
                 self.inc_dec_cw_cc,
                 self.inc_dec_ccw_cc,
                 self.continuous_cc,
-                self.min_val,
-                self.max_val,
+                self.lo_val,
+                self.hi_val,
             )
         )
 
@@ -827,7 +829,7 @@ class DeviceConnection:
             self.midi_out = self._stack.enter_context(
                 mido.open_output(io_port_name)
             )
-            mido.ports.set_sleep_time(seconds=0.03)
+            mido.ports.set_sleep_time(seconds=0.01)
             return self
         raise RuntimeError(
             f"No device with name '{self.midi_port_name}' found among {mido.get_ioport_names()}"
@@ -920,10 +922,10 @@ class DeviceConnection:
                 scene_number=scene_nr,
             )
         )
+        assert reply[0].type == SysexMessage.Type.DATA_LOAD_COMPLETED
 
         reply = self.get_reply(DeviceInquiryRequestMessage())
 
-        # request 'current scene data dump'
         reply = self.get_reply(
             NanoKontrolSysexMessage.create(
                 type=NanoKontrolSysexMessage.Type.REQUEST_CURRENT_SCENE_CONFIG,
