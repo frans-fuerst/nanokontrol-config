@@ -999,3 +999,11 @@ class DeviceConnection:
         assert any(
             r.type == SysexMessage.Type.DATA_WRITE_COMPLETED for r in reply
         )
+        reply = self.get_reply(
+            NanoKontrolSysexMessage.create(
+                type=NanoKontrolSysexMessage.Type.SET_SCENE_NUMBER,
+                midi_channel=midi_channel,
+                scene_number=0,
+            )
+        )
+        assert reply[0].type == SysexMessage.Type.DATA_LOAD_COMPLETED
