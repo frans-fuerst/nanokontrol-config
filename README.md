@@ -1,12 +1,12 @@
-# Korg (TM) nanoKONTROL Studio (TM) config tool
+# Korg™ nanoKONTROL Studio™ config tool
 
-While there exists MIDI protocol specification for other Korg (TM) nano* products
-like nanoKONTROL (TM) or nanoKONTROL2 (TM), we have nothing for the more modern
-nanoKONTROL Studio (TM) (and thus no tools like [Nano-Basket](https://github.com/royvegard/Nano-Basket)
-for the nanoKONTROL Studio (TM)
+While there exists MIDI protocol specification for other Korg™ nano* products
+like nanoKONTROL™ or nanoKONTROL2™, we have nothing for the more modern
+nanoKONTROL Studio™ (and thus no tools like [Nano-Basket](https://github.com/royvegard/Nano-Basket)
+for the nanoKONTROL Studio™
 
 This project provides a CLI tool for reading and writing configuration from and
-to YAML based config files plus a basis for future nanoKONTROL Studio (TM) based
+to YAML based config files plus a basis for future nanoKONTROL Studio™ based
 projects which need to talk to the device using the proprietary MIDI based
 protocol.
 
@@ -47,7 +47,7 @@ nanokontrol-config [<global-opts>] <CMD> [<command-opts>]
 
 ### Exporting the config
 
-Read the current config from your attached nanoKONTROL Studio (TM) device and save
+Read the current config from your attached nanoKONTROL Studio™ device and save
 it to a YAML file.
 
 ```bash
@@ -76,7 +76,7 @@ nanokontrol-config p[atch] [-i|--input sparse-config.yaml]
 
 ## Disclaimer
 
-I'm not affiliated in any way with Korg (TM) and this project is solely based on
+I'm not affiliated in any way with Korg™ and this project is solely based on
 reverse engineering MIDI I/O.
 
 Of course using this tool is fully your own risk - I hereby refuse any
@@ -129,6 +129,16 @@ git push
 uv publish --token <TOKEN>
 ```
 
+
+## Missing for a v1.0
+
+* `info` lists all devices and identifies Korg products
+* `patch` implemented
+* default values properly for all BaseModel instances implemented
+* proper documentation and comments
+* linter is satisfied
+
+
 ## Troubleshooting
 
 * Reset to firmware defaults: SCENE + BACK + STOP + Turn on
@@ -137,8 +147,9 @@ uv publish --token <TOKEN>
 ## Future
 
 * Graphical UI
-* Support for importing/exporting the Korg (TM) proprietary configuration file format
-* Support for other Korg (TM) nano* products
+* YAML import/export file config supports comments
+* Support for importing/exporting the Korg™ proprietary configuration file format
+* Support for other Korg™ nano* products
 * Support for other MIDI controllers
 * Availability for MicroPython (i.e. no dependency to `pydandtic` or `mido`)
 
@@ -149,3 +160,4 @@ uv publish --token <TOKEN>
 * [nanoKONTROL2 MIDI Implementation (v1.00 / 2010.12.14)](
 https://cdn.korg.com/us/support/download/files/aeb2862daf0cb7db826d8c62f51ec28d.txt?response-content-disposition=attachment%3Bfilename%2A%3DUTF-8%27%27nanoKONTROL2_MIDIimp.txt)
 * [uv: Building and publishing a package](https://docs.astral.sh/uv/guides/package/#preparing-your-project-for-packaging)
+* [korgforums: MIDI implementation docs for nanoKEY and nanoKONTROL Studio?](https://www.korgforums.com/forum/phpBB3/viewtopic.php?t=130754&hilit=%E5%A8%87+txt)
