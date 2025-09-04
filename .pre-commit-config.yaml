@@ -48,18 +48,30 @@ repos:
           - name: Python Unit Tests
             id: check-python-unittest
             language: system
-            entry: uv run pytest -m unit
+            entry: uv run pytest
+            args: [
+                "--ignore=_UNTRACKED",
+                "-m unit",
+                "test",
+            ]
             types: [python]
-            # also runs regular tests
-            exclude: ^(_UNTRACKED/)
+            # https://github.com/pytest-dev/pytest/discussions/7793
+            pass_filenames: false
+            always_run: true
 
           - name: Python Doctests
             id: check-python-doctest
             language: system
-            entry: uv run pytest --doctest-modules
+            entry: uv run pytest
+            args: [
+                "--ignore=_UNTRACKED",
+                "--ignore=test",
+                "--doctest-modules"
+            ]
             types: [python]
-            # also runs regular tests otherwise..
-            exclude: ^(_UNTRACKED/|test/)
+            # https://github.com/pytest-dev/pytest/discussions/7793
+            pass_filenames: false
+            always_run: true
 
           - name: Check Python import order
             id: check-python-isort
