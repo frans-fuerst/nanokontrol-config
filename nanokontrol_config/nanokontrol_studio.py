@@ -33,7 +33,7 @@ from contextlib import ExitStack
 from enum import StrEnum, auto
 from itertools import batched
 from types import FrameType, ModuleType, TracebackType
-from typing import Optional, TextIO, Type
+from typing import Optional, TextIO
 
 import mido
 import yaml
@@ -337,6 +337,9 @@ class SceneConfig(StrictModel):
         )
 
     def serialize(self) -> bytes:
+        """Returns a byte representation of a scene config ready to be packed
+        into a Sysex message"""
+
         def round_up(x: int) -> int:
             return ((x + 8 - 1) // 8) * 8
 
@@ -359,6 +362,7 @@ class SceneConfig(StrictModel):
         )
 
     def dump(self) -> None:
+        """Prints a readable representation of a Scene config for debugging"""
         print(f"Name: '{self.name}'")
         for i in range(8):
             print(
@@ -378,6 +382,8 @@ class SceneConfig(StrictModel):
 
 
 class Configuration(StrictModel):
+    """Composite Korg nanoKONTROL Studio Configuration"""
+
     global_config: GlobalConfig = GlobalConfig()
     scene_config: tuple[SceneConfig, ...] = tuple(
         SceneConfig.default(i) for i in range(5)
@@ -385,10 +391,7 @@ class Configuration(StrictModel):
 
 
 def to_yaml(configuration: Configuration) -> str:
-    """
-    >>> len(to_yaml(Configuration())) > 10
-    True
-    """
+    """Constructs a YAML string from a Korg nanoKONTROL Studio Configuration"""
 
     def config_representer(
         dumper: yaml.Dumper, data: Configuration
@@ -450,10 +453,12 @@ def to_yaml(configuration: Configuration) -> str:
 
 
 def from_yaml(yaml_stream: TextIO) -> Configuration:
+    """Reads a Korg nanoKONTROL Studio Configuration from a YAML string"""
+
     def dict_from(string: str) -> Values:
         return {k: v for e in string.split(" ") for k, v in (e.split("="),)}
 
-    raw_data = yaml.load(yaml_stream, Loader=yaml.Loader)
+    raw_data = yaml.safe_load(yaml_stream)
 
     return Configuration(
         global_config=raw_data["global"],
@@ -509,7 +514,11 @@ def from_yaml(yaml_stream: TextIO) -> Configuration:
 
 
 class SysexMessage(ABC):
+    """Abstract proprietary Korg Sysex message"""
+
     class Type(StrEnum):
+        """Types of Sysex messages - mostly Korg specific"""
+
         SEARCH_DEVICE = auto()
         DEVICE_INQUIRY_REQUEST = auto()
         DEVICE_INQUIRY_REPLY = auto()
@@ -526,7 +535,7 @@ class SysexMessage(ABC):
 
     @classmethod
     def from_raw(cls, raw_data: bytes) -> "SysexMessage":
-        # print(" ".join(f"{b:02X}" for b in raw_data[:16]))
+        """Constructs a generic Sysex message from raw data"""
         raw_bytes = bytes(raw_data)
         if raw_bytes == DeviceInquiryRequestMessage.serialized():
             return DeviceInquiryRequestMessage()
@@ -545,66 +554,85 @@ class SysexMessage(ABC):
 
     @property
     @abstractmethod
-    def type(self) -> Type: ...
+    def type(self) -> Type:
+        """Returns the Korg proprietary message type"""
 
     @abstractmethod
-    def serialized(self) -> bytes: ...
+    def serialized(self) -> bytes:
+        """Returns the full bytes representation ready to be sent"""
 
     @abstractmethod
     def __repr__(self) -> str:
-        raise NotImplementedError()
+        """Returns a human readable informative aligned string representation"""
 
     def __str__(self) -> str:
+        """Just returns __repr__"""
         return self.__repr__()
 
 
 class SearchDeviceMessage(SysexMessage):
+    """Advises all (Korg) devices to reply"""
+
     @staticmethod
     def serialized() -> bytes:
+        """Returns the full bytes representation ready to be sent"""
         return b"\x42\x50\x00\xff"
 
     @property
     def type(self) -> SysexMessage.Type:
+        """Returns the Korg proprietary message type"""
         return self.Type.SEARCH_DEVICE
 
     def __repr__(self) -> str:
+        """Returns a human readable informative aligned string representation"""
         return f"{self.type:<28} |"
 
 
 class DeviceInquiryRequestMessage(SysexMessage):
+    """Requests information about device and global MIDI channel"""
+
     @staticmethod
     def serialized() -> bytes:
+        """Returns the full bytes representation ready to be sent"""
         return b"\x7e\x7f\x06\x01"
 
     @property
     def type(self) -> SysexMessage.Type:
+        """Returns the Korg proprietary message type"""
         return self.Type.DEVICE_INQUIRY_REQUEST
 
     def __repr__(self) -> str:
+        """Returns a human readable informative aligned string representation"""
         return f"{self.type:<28} |"
 
 
 class DeviceInquiryReplyMessage(SysexMessage):
+    """Contains information about device and global MIDI channel"""
+
     raw_data: bytes
+
+    def __init__(self, raw_data: bytes) -> None:
+        """Constructs a DeviceInquiryReplyMessage from @raw_data"""
+        self.raw_data = raw_data
 
     @property
     def type(self) -> SysexMessage.Type:
+        """Returns the Korg proprietary message type"""
         return self.Type.DEVICE_INQUIRY_REPLY
 
-    def __init__(self, raw_data: bytes) -> None:
-        self.raw_data = raw_data
-
     def midi_channel(self) -> int:
-        """0..15 => 1..16"""
+        """returns the MIDI channel component (0..15)"""
         return self.raw_data[1] % 16
 
     def serialized(self) -> bytes:
+        """Returns the full bytes representation ready to be sent"""
         return self.raw_data
 
     def __repr__(self) -> str:
+        """Returns a human readable informative aligned string representation"""
+
         # 7E 02 06 02 42 37 01 00 00 05 00 01 00
         # 42 50 01 01 04 37 01 00 00 05 00 01 00
-
         return (
             f"{self.type:<28} |"
             f" midi={self.midi_channel() + 1:02}"
@@ -614,6 +642,8 @@ class DeviceInquiryReplyMessage(SysexMessage):
 
 
 class NanoKontrolSysexMessage(SysexMessage, StrictModel):
+    """A Sysex message mostly specific to nanoKONTROL Studio configuration"""
+
     manufacturer: int = 0x42
     project_id: int = 0x37
     midi_channel: int
@@ -622,12 +652,15 @@ class NanoKontrolSysexMessage(SysexMessage, StrictModel):
     @classmethod
     def create(
         cls,
-        type: SysexMessage.Type,
+        msg_type: SysexMessage.Type,
         midi_channel: int,
         scene_number: None | int = None,
         unpacked: None | bytes = None,
         **kwargs: int,
     ) -> "NanoKontrolSysexMessage":
+        """Constructs a nanoKONTROL specific Sysex message from specific
+        message parameters"""
+
         def payload_from(
             msg_type: SysexMessage.Type,
             scene_number: None | int = None,
@@ -661,11 +694,11 @@ class NanoKontrolSysexMessage(SysexMessage, StrictModel):
                 if not unpacked:
                     raise RuntimeError("Need unpacked bytes")
                 return b"\x51" + cls.pack_7b(unpacked) + b"\x03\x7f\x7f"
-            raise RuntimeError(f"Unknown message type {type}")
+            raise RuntimeError(f"Unknown message type {msg_type}")
 
         return cls(
             payload=payload_from(
-                msg_type=type, scene_number=scene_number, unpacked=unpacked
+                msg_type=msg_type, scene_number=scene_number, unpacked=unpacked
             ),
             midi_channel=midi_channel,
             **{
@@ -677,6 +710,7 @@ class NanoKontrolSysexMessage(SysexMessage, StrictModel):
 
     @classmethod
     def from_raw(cls, data: bytes) -> "NanoKontrolSysexMessage":
+        """Constructs a nanoKONTROL specific Sysex message from raw data"""
         payload_size = (data[7] << 14) + (data[6] << 7) + data[5]
         assert payload_size + 8 == len(data), (
             f"payload size {payload_size} does not match actual size {len(data) - 8}"
@@ -690,6 +724,7 @@ class NanoKontrolSysexMessage(SysexMessage, StrictModel):
 
     @property
     def type(self) -> SysexMessage.Type:
+        """Returns the Korg proprietary message type"""
         if self.payload[0] == 0x10:
             assert len(self.payload) == 1
             return self.Type.REQUEST_CURRENT_SCENE_CONFIG
@@ -724,6 +759,7 @@ class NanoKontrolSysexMessage(SysexMessage, StrictModel):
 
     @property
     def scene_number(self) -> int:
+        """Returns the scene_number information extracted from payload"""
         assert self.type in {
             self.Type.SET_SCENE_NUMBER,
             self.Type.REQUEST_SAVE_SCENE_CONFIG,
@@ -732,6 +768,8 @@ class NanoKontrolSysexMessage(SysexMessage, StrictModel):
 
     @property
     def unpacked(self) -> bytes:
+        """Returns the '7-bit-decoded' payload used for global config and
+        scene config"""
         assert self.type in {self.Type.SCENE_CONFIG, self.Type.GLOBAL_CONFIG}
         temp_effective_length = (
             len(self.payload) - 3
@@ -741,6 +779,7 @@ class NanoKontrolSysexMessage(SysexMessage, StrictModel):
         return self.unpack_7b(self.payload[1:temp_effective_length])
 
     def serialized(self) -> bytes:
+        """Returns the full bytes representation ready to be sent"""
         return (
             bytes(
                 (
@@ -758,6 +797,7 @@ class NanoKontrolSysexMessage(SysexMessage, StrictModel):
         )
 
     def __repr__(self) -> str:
+        """Returns a human readable informative aligned string representation"""
         return (
             f"{self.type:<28}"
             f" | device={self.manufacturer:02X}-{self.project_id:02X}"
@@ -766,6 +806,13 @@ class NanoKontrolSysexMessage(SysexMessage, StrictModel):
 
     @staticmethod
     def unpack_7b(data: bytes) -> bytes:
+        """Reverse function for pack_7b(): turn 8 '7 bit byte' chunks with the
+        first one containing the MSBs for the 7 following bytes into a chunk of
+        7 '8 bit bytes'
+        >>> NanoKontrolSysexMessage.unpack_7b(
+        ...     NanoKontrolSysexMessage.pack_7b(bytes(b"1234567")))
+        b'1234567'
+        """
         assert len(data) % 8 == 0, f"len:={len(data)}%8!==0"
         return bytes(
             c | b
@@ -777,11 +824,16 @@ class NanoKontrolSysexMessage(SysexMessage, StrictModel):
                     if i % 8 == 0
                     for b in f"{c:07b}"[::-1]
                 ),
+                strict=True,
             )
         )
 
     @staticmethod
     def pack_7b(data: bytes) -> bytes:
+        """Returns a '7 bit representation' of a byte sequence by turning chunks
+        of 7 '8 bit bytes' into 7 '7 bit bytes' with the MSB set to 0, prefixed
+        by 1 '7 bit byte' containing the seven MSBs."""
+
         def pack_msb(values: Sequence[int]) -> Sequence[int]:
             result = [0]
             for i, v in enumerate(values):
@@ -797,12 +849,15 @@ class NanoKontrolSysexMessage(SysexMessage, StrictModel):
 
     @staticmethod
     def formatted(enumerated: Iterable[tuple[int, int]]) -> str:
+        """Returns a readable representation of a byte sequence already zipped
+        with it's index"""
         return "".join(
             f"{i:03}-{c:03}-{(chr(c) if 32 <= c < 127 else '■' if c == 255 else '?')}|"
             for i, c in enumerated
         )
 
     def dump(self) -> None:
+        """Dumps a human readable representation to stdout"""
         if self.type == self.Type.SCENE_CONFIG:
             for chunk in batched(enumerate(self.unpacked), 8):
                 print(self.formatted(chunk))
@@ -812,13 +867,21 @@ class NanoKontrolSysexMessage(SysexMessage, StrictModel):
 
 
 class DeviceConnection:
+    """Provides capability to send and receive SysEx messages to an attached
+    Korg nanoKONTROL Studio device and perform higher level operations like
+    sending and receiving configuration
+    """
+
     def __init__(self, midi_port_name: str) -> None:
+        """Creates a MIDI connection instance to MIDI port specified via
+        @midi_port_name"""
         self.midi_port_name = midi_port_name
         self.midi_in: None | mido.Input = None
         self.midi_out: None | mido.Output = None
         self._stack = ExitStack()
 
     def __enter__(self) -> "DeviceConnection":
+        """Opens specified MIDI port for reading and writing"""
         for io_port_name in mido.get_ioport_names():
             if self.midi_port_name not in io_port_name:
                 continue
@@ -837,15 +900,19 @@ class DeviceConnection:
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_type: None | type[BaseException],
+        exc_val: None | BaseException,
+        exc_tb: None | TracebackType,
     ) -> None | bool:
+        """Closes all open contexts, i.e. open MIDI connections"""
         return self._stack.__exit__(exc_type, exc_val, exc_tb)
 
     def get_reply(
         self, data_or_message: str | Sequence[int] | SysexMessage
     ) -> Sequence[SysexMessage]:
+        """Send @data_or_message to attached device and returns replies
+        (usually only one).
+        Message can be a SysexMessage instance or a byte sequence."""
         if not self.midi_out:
             raise RuntimeError("No midi_out device defined")
         assert isinstance(data_or_message, SysexMessage), data_or_message
@@ -862,12 +929,12 @@ class DeviceConnection:
         self.midi_out.send(
             mido.Message("sysex", data=parsed_request.serialized())
         )
-        while not (messages := self.receive_messages()):
+        while not (messages := self._receive_messages()):
             # LOG.debug("retry receive")
             continue
         return messages
 
-    def receive_messages(self) -> Sequence[SysexMessage]:
+    def _receive_messages(self) -> Sequence[SysexMessage]:
         if not self.midi_in:
             raise RuntimeError("No midi_in device defined")
         mido.ports.sleep()
@@ -883,10 +950,13 @@ class DeviceConnection:
         return reply
 
     def watch_messages(self) -> GlobalConfig:
+        """Just reads messages and writes a readable representation to the log.
+        For monitoring similar to `aseqdump -p <port>`"""
         while True:
-            self.receive_messages()
+            self._receive_messages()
 
     def read_global_config(self) -> GlobalConfig:
+        """Retrieves the global configuration from the device"""
         reply = self.get_reply(DeviceInquiryRequestMessage())
         assert isinstance(reply[-1], DeviceInquiryReplyMessage)
         midi_channel = reply[-1].midi_channel()
@@ -900,7 +970,7 @@ class DeviceConnection:
 
         reply = self.get_reply(
             NanoKontrolSysexMessage.create(
-                type=NanoKontrolSysexMessage.Type.REQUEST_GLOBAL_CONFIG,
+                msg_type=NanoKontrolSysexMessage.Type.REQUEST_GLOBAL_CONFIG,
                 midi_channel=midi_channel,
             )
         )
@@ -911,13 +981,15 @@ class DeviceConnection:
         return GlobalConfig.from_raw(reply[0].unpacked)
 
     def read_scene_config(self, scene_nr: int) -> SceneConfig:
+        """Retrieves scene config @scene_nr (ranging from 1 to 5)
+        from the device"""
         reply = self.get_reply(DeviceInquiryRequestMessage())
         assert isinstance(reply[-1], DeviceInquiryReplyMessage)
         midi_channel = reply[-1].midi_channel()
 
         reply = self.get_reply(
             NanoKontrolSysexMessage.create(
-                type=NanoKontrolSysexMessage.Type.SET_SCENE_NUMBER,
+                msg_type=NanoKontrolSysexMessage.Type.SET_SCENE_NUMBER,
                 midi_channel=midi_channel,
                 scene_number=scene_nr,
             )
@@ -928,7 +1000,7 @@ class DeviceConnection:
 
         reply = self.get_reply(
             NanoKontrolSysexMessage.create(
-                type=NanoKontrolSysexMessage.Type.REQUEST_CURRENT_SCENE_CONFIG,
+                msg_type=NanoKontrolSysexMessage.Type.REQUEST_CURRENT_SCENE_CONFIG,
                 midi_channel=midi_channel,
                 scene_number=scene_nr,
             )
@@ -943,6 +1015,7 @@ class DeviceConnection:
         return SceneConfig.from_raw(scene_config_message.unpacked)
 
     def write_global_config(self, global_config: GlobalConfig) -> None:
+        """Writes the provided @global_config to the device"""
         global_config.dump()
 
         reply = self.get_reply(DeviceInquiryRequestMessage())
@@ -951,7 +1024,7 @@ class DeviceConnection:
 
         reply = self.get_reply(
             NanoKontrolSysexMessage.create(
-                type=NanoKontrolSysexMessage.Type.GLOBAL_CONFIG,
+                msg_type=NanoKontrolSysexMessage.Type.GLOBAL_CONFIG,
                 midi_channel=midi_channel,
                 unpacked=global_config.serialize(),
             )
@@ -964,6 +1037,8 @@ class DeviceConnection:
     def write_scene_config(
         self, scene_nr: int, scene_config: SceneConfig
     ) -> None:
+        """Writes the provided @scene_config to the device as scene @scene_nr
+        (ranging from 1 to 5)"""
         scene_config.dump()
 
         reply = self.get_reply(DeviceInquiryRequestMessage())
@@ -972,7 +1047,7 @@ class DeviceConnection:
 
         reply = self.get_reply(
             NanoKontrolSysexMessage.create(
-                type=NanoKontrolSysexMessage.Type.SCENE_CONFIG,
+                msg_type=NanoKontrolSysexMessage.Type.SCENE_CONFIG,
                 midi_channel=midi_channel,
                 unpacked=scene_config.serialize(),
             )
@@ -989,7 +1064,7 @@ class DeviceConnection:
 
         reply = self.get_reply(
             NanoKontrolSysexMessage.create(
-                type=SysexMessage.Type.REQUEST_SAVE_SCENE_CONFIG,
+                msg_type=SysexMessage.Type.REQUEST_SAVE_SCENE_CONFIG,
                 midi_channel=midi_channel,
                 scene_number=scene_nr,
             )
@@ -1001,7 +1076,7 @@ class DeviceConnection:
         )
         reply = self.get_reply(
             NanoKontrolSysexMessage.create(
-                type=NanoKontrolSysexMessage.Type.SET_SCENE_NUMBER,
+                msg_type=NanoKontrolSysexMessage.Type.SET_SCENE_NUMBER,
                 midi_channel=midi_channel,
                 scene_number=0,
             )
