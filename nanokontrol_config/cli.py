@@ -35,6 +35,7 @@ from pathlib import Path
 
 import mido
 
+from nanokontrol_config import __version__
 from nanokontrol_config.nanokontrol_studio import (
     Configuration,
     DeviceConnection,
@@ -93,6 +94,7 @@ def fn_patch_config(args: Args) -> None:
 
 def parse_args(argv: Sequence[str] | None = None) -> Args:
     parser = ArgumentParser(__doc__)
+    parser.add_argument("--version", action="store_true")
     parser.add_argument("--verbose", "-v", action="store_true")
     parser.add_argument("--port", "-p", type=str, default="nanoKONTROL Studio")
 
@@ -130,6 +132,10 @@ def parse_args(argv: Sequence[str] | None = None) -> Args:
 
 def main() -> None:
     args = parse_args()
+    if args.version:
+        print(__version__)
+        return
+
     logging.basicConfig(
         format=f"%(levelname)-7s %(asctime)s.%(msecs)03d %(name)-12s│ %(message)s",
         datefmt="%H:%M:%S",
